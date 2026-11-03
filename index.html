@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SignSpeak India — Sign Language to Speech</title>
+  <!-- Tailwind CSS via CDN for rapid styling -->
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-[#F7F6F0] p-4 sm:p-6 text-gray-900 font-sans min-h-screen">
+
+  <!-- Header -->
+  <header class="flex flex-wrap justify-between items-center mb-6 max-w-7xl mx-auto gap-4">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 bg-emerald-600 rounded-xl flex items-center justify-center text-white text-lg font-bold shadow-sm">
+        🖐
+      </div>
+      <div>
+        <h1 class="text-xl font-bold tracking-tight text-gray-900">SignSpeak India</h1>
+        <p class="text-xs text-gray-500 hidden sm:block">Real-time Indian Sign Language Accessibility Tool</p>
+      </div>
+      <span class="ml-2 bg-emerald-100 text-emerald-800 text-xs font-semibold px-3 py-1 rounded-full flex items-center gap-1.5">
+        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+        Live Camera
+      </span>
+    </div>
+
+    <!-- Controls / Language Selector -->
+    <div class="flex items-center gap-3">
+      <select id="langSelect" class="bg-white border border-gray-200 text-sm font-medium rounded-xl px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
+        <option value="en-IN">English (India)</option>
+        <option value="hi-IN">Hindi (हिंदी)</option>
+        <option value="mr-IN">Marathi (मराठी)</option>
+      </select>
+    </div>
+  </header>
+
+  <!-- Main Grid Workspace -->
+  <main class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6">
+    
+    <!-- Left Column: Live Camera Feed -->
+    <div class="lg:col-span-7 bg-white rounded-2xl p-5 shadow-sm border border-gray-200/80 flex flex-col justify-between">
+      <div>
+        <div class="flex justify-between items-center mb-3">
+          <span class="text-sm font-semibold text-gray-700 flex items-center gap-2">
+            📷 Camera Viewport
+          </span>
+          <span id="cameraResolution" class="text-xs text-gray-400 font-mono">Standby</span>
+        </div>
+
+        <!-- Video Frame Container -->
+        <div class="relative aspect-video bg-gray-950 rounded-xl overflow-hidden flex items-center justify-center shadow-inner">
+          <video id="webcam" autoplay playsinline class="w-full h-full object-cover hidden"></video>
+          <canvas id="landmarkCanvas" class="absolute inset-0 w-full h-full pointer-events-none" aria-hidden="true"></canvas>
+          <!-- Recording Countdown & Status Overlay -->
+          <div id="recordingOverlay" class="absolute inset-0 bg-black/40 backdrop-blur-xs flex flex-col items-center justify-center pointer-events-none hidden z-20">
+            <div id="recordingCountdownText" class="text-6xl font-black text-white drop-shadow-lg">3</div>
+            <p id="recordingSubtext" class="text-white text-sm font-semibold tracking-wide uppercase mt-2">Get Ready to Sign...</p>
+            <div class="w-48 bg-gray-700/80 h-2 rounded-full overflow-hidden mt-3">
+              <div id="recordingProgressBar" class="bg-red-500 h-full w-0 transition-all duration-75"></div>
+            </div>
+          </div>
+          
+          <!-- Placeholder when camera is off -->
+          <div id="cameraPlaceholder" class="text-center p-6">
+            <div class="w-12 h-12 rounded-full bg-gray-800 text-gray-400 mx-auto flex items-center justify-center text-xl mb-2">📹</div>
+            <p class="text-gray-400 text-sm font-medium">Camera is currently offline</p>
+            <p class="text-gray-500 text-xs mt-1">Click "Start Camera" to enable sign recognition</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Video Control Footer -->
+      <div class="mt-4 pt-3 border-t border-gray-100 flex justify-between items-center">
+        <span id="statusText" class="text-xs font-medium text-gray-500">
+          ● Camera inactive
+        </span>
+        <button id="cameraBtn" onclick="toggleWebcam()" class="px-5 py-2.5 bg-gray-900 hover:bg-gray-800 text-white rounded-xl text-sm font-semibold transition shadow-sm">
+          Start Camera
+        </button>
+      </div>
+    </div>
+
+    <!-- Right Column: Predictions & Speech Output -->
+    <div class="lg:col-span-5 flex flex-col gap-4">
+      
+      <!-- Live Gesture Prediction Card -->
+      <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-200/80">
+        <div class="flex justify-between items-center mb-2">
+          <span class="text-xs font-bold text-emerald-600 uppercase tracking-wider flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+            Detected Sign
+          </span>
+          <span id="matchConfidence" class="bg-emerald-50 text-emerald-700 border border-emerald-200/60 text-xs font-semibold px-2.5 py-0.5 rounded-full">
+            Waiting for sign
+          </span>
+        </div>
+        <h2 id="predictionText" class="text-4xl font-black tracking-tight text-gray-900 my-1">
+          —
+        </h2>
+        <div class="w-full bg-gray-100 h-1.5 rounded-full overflow-hidden mt-3">
+          <div id="confidenceBar" class="bg-emerald-500 h-full w-0 transition-all duration-300"></div>
+        </div>
+      </div>
+
+      <!-- Constructed Sentence Output Card -->
+      <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-200/80 flex-1 flex flex-col justify-between">
+        <div>
+          <span class="text-sm font-semibold text-gray-700 block mb-2">
+            Constructed Speech Sentence
+          </span>
+          <div class="p-4 bg-gray-50 rounded-xl border border-gray-100 min-h-[100px] flex items-center">
+            <p id="sentenceText" class="text-xl font-medium text-gray-800 leading-relaxed">
+              Recognized signs will appear here.
+            </p>
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="mt-4 space-y-2">
+          <button onclick="speakCurrentSentence()" class="w-full bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-semibold py-3 rounded-xl transition shadow-sm flex items-center justify-center gap-2">
+            <span>🔊</span> Speak Sentence Aloud
+          </button>
+
+          <div class="flex gap-2">
+            <button onclick="clearSentence()" class="flex-1 py-2 text-xs font-semibold bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg transition">
+              Clear Text
+            </button>
+            <button onclick="copySentence()" class="flex-1 py-2 text-xs font-semibold bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg transition">
+              Copy Text
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- AI/ML Data Collection Studio: Browser Landmark Recorder -->
+  <section class="max-w-7xl mx-auto mt-6 bg-gradient-to-r from-slate-900 to-indigo-950 text-white rounded-2xl p-5 shadow-lg border border-indigo-900/50">
+    <div class="flex flex-wrap items-center justify-between gap-4 mb-4 pb-3 border-b border-indigo-800/60">
+      <div class="flex items-center gap-3">
+        <span class="w-10 h-10 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-xl font-bold border border-indigo-500/30">
+          🎙️
+        </span>
+        <div>
+          <div class="flex items-center gap-2">
+            <h2 class="text-base font-bold tracking-tight text-white">Browser Sample Recording Studio</h2>
+            <span class="bg-indigo-500/20 text-indigo-300 text-xs px-2.5 py-0.5 rounded-full border border-indigo-500/30 font-medium">AIML Developer</span>
+          </div>
+          <p class="text-xs text-indigo-200/70">Capture real webcam 30-frame landmark sequences to eliminate domain shift & calibrate unknown/neutral gestures</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <span id="sessionCounterBadge" class="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-xs font-semibold px-3 py-1 rounded-full flex items-center gap-1.5">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+          <span id="sessionSamplesCount">0</span> Samples Recorded
+        </span>
+      </div>
+    </div>
+
+    <!-- Recorder Controls Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+      <!-- Target Class Dropdown -->
+      <div class="md:col-span-4">
+        <label class="block text-xs font-semibold text-indigo-200 mb-1.5">Target Gesture Label</label>
+        <div class="relative">
+          <select id="recordLabelSelect" onchange="handleLabelSelectChange()" class="w-full bg-slate-800 border border-indigo-700/60 text-white text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-400 font-medium">
+            <optgroup label="Essential Calibration">
+              <option value="unknown" selected>⚠️ unknown / no_sign (Resting / Noise / Idle)</option>
+            </optgroup>
+            <optgroup label="Current 13 Target Classes">
+              <option value="actor">actor</option>
+              <option value="adult">adult</option>
+              <option value="afternoon">afternoon</option>
+              <option value="alive">alive</option>
+              <option value="alright">alright</option>
+              <option value="animal">animal</option>
+              <option value="bad">bad</option>
+              <option value="bag">bag</option>
+              <option value="ball">ball</option>
+              <option value="bank">bank</option>
+              <option value="bathroom">bathroom</option>
+              <option value="beautiful">beautiful</option>
+              <option value="doctor">doctor (Need Doctor)</option>
+            </optgroup>
+            <optgroup label="Emergency & Useful ISL Additions">
+              <option value="thankyou">thankyou (Thank You)</option>
+              <option value="hospital">hospital</option>
+              <option value="medicine">medicine</option>
+              <option value="police">police</option>
+              <option value="sick">sick</option>
+            </optgroup>
+            <optgroup label="Custom">
+              <option value="__custom__">➕ Type custom sign...</option>
+            </optgroup>
+          </select>
+          <input type="text" id="customLabelInput" placeholder="Enter sign name..." class="hidden w-full mt-2 bg-slate-800 border border-indigo-600 text-white text-sm rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400 font-medium">
+        </div>
+      </div>
+
+      <!-- Signer ID Input -->
+      <div class="md:col-span-3">
+        <label class="block text-xs font-semibold text-indigo-200 mb-1.5">Signer Name / ID</label>
+        <input type="text" id="recordSignerInput" value="signer_aryan" placeholder="e.g. signer_1" class="w-full bg-slate-800 border border-indigo-700/60 text-white text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-400 font-medium">
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="md:col-span-5 flex flex-wrap gap-2">
+        <button id="recordSampleBtn" onclick="startSampleRecording()" class="flex-1 bg-red-600 hover:bg-red-700 active:bg-red-800 text-white font-semibold py-2.5 px-4 rounded-xl transition shadow flex items-center justify-center gap-2 text-sm">
+          <span class="w-2.5 h-2.5 rounded-full bg-white animate-pulse"></span>
+          Record Sample (30 Frames)
+        </button>
+        <button onclick="recordBurstIdleSamples()" class="bg-indigo-700/70 hover:bg-indigo-600 text-white font-medium py-2.5 px-3.5 rounded-xl transition text-xs flex items-center gap-1.5 border border-indigo-500/40">
+          ⚡ Quick 3x Idle
+        </button>
+      </div>
+    </div>
+
+    <!-- Active Samples Inventory Breakdown -->
+    <div class="mt-4 pt-3 border-t border-indigo-900/60 flex flex-wrap items-center justify-between gap-2 text-xs">
+      <div class="flex items-center gap-2">
+        <span class="text-indigo-300 font-semibold">Saved Samples on Disk:</span>
+        <div id="samplesSummaryChips" class="flex flex-wrap gap-1.5">
+          <span class="text-indigo-400/80 italic">Loading inventory...</span>
+        </div>
+      </div>
+      <span id="recordStatusMsg" class="text-xs text-indigo-300 font-medium">Ready to record</span>
+    </div>
+  </section>
+
+
+  <!-- Emergency & Quick Actions Broadcast Bar -->
+  <footer class="max-w-7xl mx-auto mt-6 bg-white rounded-2xl p-5 shadow-sm border border-gray-200/80">
+    <div class="flex items-center justify-between mb-3">
+      <h3 class="text-xs font-bold text-red-600 uppercase tracking-wider flex items-center gap-1.5">
+        <span class="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
+        Emergency & Quick Broadcast (One-Tap Alert)
+      </h3>
+      <span class="text-xs text-gray-400">Direct Audio Output</span>
+    </div>
+
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <!-- Emergency Card 1 -->
+      <button onclick="triggerEmergency('Doctor needed immediately!', 'Doctor needed immediately')" className="" class="p-3 bg-red-50 hover:bg-red-100 border border-red-100 rounded-xl text-left transition group">
+        <span class="font-bold text-sm text-red-900 block group-hover:scale-105 transition-transform">🏥 Need Doctor</span>
+        <span class="text-xs text-red-600">डॉक्टर चाहिए</span>
+      </button>
+
+      <!-- Emergency Card 2 -->
+      <button onclick="triggerEmergency('Emergency help needed!', 'Emergency help needed')" class="p-3 bg-red-50 hover:bg-red-100 border border-red-100 rounded-xl text-left transition group">
+        <span class="font-bold text-sm text-red-900 block group-hover:scale-105 transition-transform">🚨 Emergency</span>
+        <span class="text-xs text-red-600">मदद चाहिए</span>
+      </button>
+
+      <!-- Quick Card 3 -->
+      <button onclick="triggerEmergency('I need water, please.', 'I need water please')" class="p-3 bg-gray-50 hover:bg-gray-100 border border-gray-200/80 rounded-xl text-left transition group">
+        <span class="font-bold text-sm text-gray-800 block group-hover:scale-105 transition-transform">💧 Need Water</span>
+        <span class="text-xs text-gray-500">पानी चाहिए</span>
+      </button>
+
+      <!-- Quick Card 4 -->
+      <button onclick="triggerEmergency('Call an ambulance!', 'Call an ambulance')" class="p-3 bg-gray-50 hover:bg-gray-100 border border-gray-200/80 rounded-xl text-left transition group">
+        <span class="font-bold text-sm text-gray-800 block group-hover:scale-105 transition-transform">🚑 Ambulance (108)</span>
+        <span class="text-xs text-gray-500">एम्बुलेंस 108</span>
+      </button>
+
+      <!-- Quick Card 5 -->
+      <button onclick="triggerEmergency('Thank you very much.', 'Thank you very much')" class="p-3 bg-gray-50 hover:bg-gray-100 border border-gray-200/80 rounded-xl text-left transition group">
+        <span class="font-bold text-sm text-gray-800 block group-hover:scale-105 transition-transform">🙏 Thank You</span>
+        <span class="text-xs text-gray-500">धन्यवाद</span>
+      </button>
+    </div>
+  </footer>
+
+  <!-- MediaPipe Tasks Vision runs locally in the browser; predictions use the FastAPI WebSocket. -->
+  <script type="module">
+    const video = document.getElementById('webcam');
+    const canvas = document.getElementById('landmarkCanvas');
+    const canvasContext = canvas.getContext('2d');
+    const statusText = document.getElementById('statusText');
+    const cameraButton = document.getElementById('cameraBtn');
+    const cameraPlaceholder = document.getElementById('cameraPlaceholder');
+    const cameraResolution = document.getElementById('cameraResolution');
+    const predictionText = document.getElementById('predictionText');
+    const matchConfidence = document.getElementById('matchConfidence');
+    const confidenceBar = document.getElementById('confidenceBar');
+    const sentenceText = document.getElementById('sentenceText');
+
+    const FEATURE_COUNT = 225;
+    const FRAME_INTERVAL_MS = 1000 / 15;
+    const HAND_CONNECTIONS = [
+      [0,1],[1,2],[2,3],[3,4], [0,5],[5,6],[6,7],[7,8], [5,9],[9,10],[10,11],[11,12],
+      [9,13],[13,14],[14,15],[15,16], [13,17],[0,17],[17,18],[18,19],[19,20]
+    ];
+    const POSE_CONNECTIONS = [
+      [0,1],[1,2],[2,3],[3,7],[0,4],[4,5],[5,6],[6,8],[9,10],[11,12],
+      [11,13],[13,15],[15,17],[15,19],[15,21],[12,14],[14,16],[16,18],[16,20],[16,22],
+      [11,23],[12,24],[23,24],[23,25],[25,27],[27,29],[29,31],[27,31],
+      [24,26],[26,28],[28,30],[30,32],[28,32]
+    ];
+
+    let mediaStream = null;
+    let socket = null;
+    let poseLandmarker = null;
+    let handLandmarker = null;
+    let landmarkersPromise = null;
+    let recognitionActive = false;
+    let lastFrameAt = 0;
+    let candidateSign = '';
+    let candidateCount = 0;
+    let committedSign = '';
+
+    function setStatus(message) {
+      statusText.textContent = `● ${message}`;
+    }
+
+    async function initializeLandmarkers() {
+      if (landmarkersPromise) return landmarkersPromise;
+      landmarkersPromise = (async () => {
+        const { FilesetResolver, PoseLandmarker, HandLandmarker } = await import(
+          'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/vision_bundle.mjs'
+        );
+        const files = await FilesetResolver.forVisionTasks(
+          'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm'
+        );
+        const [pose, hands] = await Promise.all([
+          PoseLandmarker.createFromOptions(files, {
+            baseOptions: { modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task' },
+            runningMode: 'VIDEO', numPoses: 1
+          }),
+          HandLandmarker.createFromOptions(files, {
+            baseOptions: { modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task' },
+            runningMode: 'VIDEO', numHands: 2
+          })
+        ]);
+        poseLandmarker = pose;
+        handLandmarker = hands;
+      })();
+      try {
+        await landmarkersPromise;
+      } catch (error) {
+        landmarkersPromise = null;
+        throw error;
+      }
+    }
+
+    function websocketUrl() {
+      const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
+      const host = location.hostname || 'localhost';
+      return `${scheme}://${host}:8000/ws`;
+    }
+
+    function connectBackend() {
+      return new Promise((resolve, reject) => {
+        const ws = new WebSocket(websocketUrl());
+        socket = ws;
+        const timeout = setTimeout(() => {
+          ws.close();
+          reject(new Error('Backend connection timed out. Start the FastAPI server on port 8000.'));
+        }, 8000);
+        ws.addEventListener('open', () => {
+          clearTimeout(timeout);
+          resolve();
+        }, { once: true });
+        ws.addEventListener('error', () => {
+          clearTimeout(timeout);
+          ws.close();
+          reject(new Error('Cannot connect to the backend. Start FastAPI at http://localhost:8000.'));
+        }, { once: true });
+        ws.addEventListener('message', handleBackendMessage);
+        ws.addEventListener('close', () => {
+          if (recognitionActive) setStatus('Backend disconnected — camera landmarks are still shown');
+        });
+      });
+    }
+
+    function handleBackendMessage(event) {
+      let message;
+      try { message = JSON.parse(event.data); } catch { return; }
+      if (message.type === 'status') {
+        setStatus(`Collecting landmarks (${message.frames_buffered}/${message.frames_required})`);
+      } else if (message.type === 'prediction') {
+        renderPrediction(message);
+      } else if (message.type === 'error') {
+        setStatus(message.message || 'Prediction service reported an error');
+      }
+    }
+
+    function renderPrediction(result) {
+      const sign = String(result.predicted_sign || '').trim();
+      const confidence = Math.max(0, Math.min(100, Number(result.confidence) || 0));
+      if (!sign) return;
+      
+      const isUnknown = sign.toLowerCase() === 'unknown' || sign.toLowerCase() === 'no_sign';
+      
+      // Handle Unknown / Neutral pose
+      if (isUnknown) {
+        predictionText.textContent = 'Resting / Neutral';
+        predictionText.className = 'text-2xl font-semibold tracking-tight text-gray-400 my-1';
+        matchConfidence.textContent = 'No Sign Active';
+        matchConfidence.className = 'bg-gray-100 text-gray-600 border border-gray-200 text-xs font-semibold px-2.5 py-0.5 rounded-full';
+        confidenceBar.style.width = '0%';
+        candidateSign = '';
+        candidateCount = 0;
+        return;
+      }
+
+      // Handle Low Confidence (< 60%) - Do not flash misleading guesses!
+      if (confidence < 60) {
+        predictionText.textContent = '—';
+        predictionText.className = 'text-4xl font-black tracking-tight text-gray-300 my-1';
+        matchConfidence.textContent = `${confidence.toFixed(1)}% (Low Confidence)`;
+        matchConfidence.className = 'bg-amber-50 text-amber-700 border border-amber-200 text-xs font-semibold px-2.5 py-0.5 rounded-full';
+        confidenceBar.style.width = `${confidence}%`;
+        confidenceBar.className = 'bg-amber-400 h-full transition-all duration-300';
+        candidateSign = '';
+        candidateCount = 0;
+        return;
+      }
+
+      // High Confidence valid sign
+      predictionText.textContent = sign.toUpperCase();
+      predictionText.className = 'text-4xl font-black tracking-tight text-emerald-600 my-1';
+      matchConfidence.textContent = `${confidence.toFixed(1)}% Match`;
+      matchConfidence.className = 'bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold px-2.5 py-0.5 rounded-full';
+      confidenceBar.style.width = `${confidence}%`;
+      confidenceBar.className = 'bg-emerald-500 h-full transition-all duration-300';
+      setStatus('Camera and live sign recognition active');
+
+      if (candidateSign === sign) candidateCount += 1;
+      else { candidateSign = sign; candidateCount = 1; }
+      
+      if (candidateCount >= 3 && committedSign !== sign) {
+        const current = sentenceText.textContent.trim();
+        const placeholder = 'Recognized signs will appear here.';
+        sentenceText.textContent = (!current || current === placeholder) ? sign : `${current} ${sign}`;
+        committedSign = sign;
+        speakText(sign);
+      }
+    }
+
+    function resizeCanvas() {
+      const bounds = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      if (canvas.width !== Math.round(bounds.width * dpr) || canvas.height !== Math.round(bounds.height * dpr)) {
+        canvas.width = Math.round(bounds.width * dpr);
+        canvas.height = Math.round(bounds.height * dpr);
+      }
+      canvasContext.setTransform(dpr, 0, 0, dpr, 0, 0);
+      return bounds;
+    }
+
+    function drawConnections(landmarks, connections, width, height, color) {
+      if (!landmarks) return;
+      canvasContext.strokeStyle = color;
+      canvasContext.lineWidth = 2;
+      canvasContext.beginPath();
+      for (const [start, end] of connections) {
+        const a = landmarks[start], b = landmarks[end];
+        if (!a || !b) continue;
+        canvasContext.moveTo(a.x * width, a.y * height);
+        canvasContext.lineTo(b.x * width, b.y * height);
+      }
+      canvasContext.stroke();
+      canvasContext.fillStyle = color;
+      for (const point of landmarks) {
+        canvasContext.beginPath();
+        canvasContext.arc(point.x * width, point.y * height, 2.5, 0, Math.PI * 2);
+        canvasContext.fill();
+      }
+    }
+
+    function writeLandmarks(target, start, landmarks, expectedCount) {
+      if (!landmarks || landmarks.length !== expectedCount) return;
+      for (let index = 0; index < expectedCount; index += 1) {
+        const point = landmarks[index];
+        target[start + index * 3] = point?.x || 0;
+        target[start + index * 3 + 1] = point?.y || 0;
+        target[start + index * 3 + 2] = point?.z || 0;
+      }
+    }
+
+    function processVideoFrame(now) {
+      if (!recognitionActive) return;
+      requestAnimationFrame(processVideoFrame);
+      if (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || now - lastFrameAt < FRAME_INTERVAL_MS) return;
+      lastFrameAt = now;
+
+      try {
+        const timestamp = Math.max(1, Math.round(now));
+        const poseResult = poseLandmarker.detectForVideo(video, timestamp);
+        const handResult = handLandmarker.detectForVideo(video, timestamp);
+        const bounds = resizeCanvas();
+        canvasContext.clearRect(0, 0, bounds.width, bounds.height);
+        const pose = poseResult.landmarks?.[0];
+        drawConnections(pose, POSE_CONNECTIONS, bounds.width, bounds.height, '#34d399');
+
+        const frame = new Float32Array(FEATURE_COUNT);
+        writeLandmarks(frame, 0, pose, 33);
+        const leftHand = new Array(21).fill(null);
+        const rightHand = new Array(21).fill(null);
+        (handResult.landmarks || []).forEach((hand, index) => {
+          const handedness = handResult.handedness?.[index]?.[0]?.categoryName?.toLowerCase();
+          // MediaPipe's handedness labels assume mirrored selfie input; this camera frame is unmirrored.
+          const target = handedness === 'left' ? rightHand : leftHand;
+          if (hand.length === 21) target.splice(0, 21, ...hand);
+          drawConnections(hand, HAND_CONNECTIONS, bounds.width, bounds.height, handedness === 'left' ? '#60a5fa' : '#fbbf24');
+        });
+        writeLandmarks(frame, 99, leftHand, 21);
+        writeLandmarks(frame, 162, rightHand, 21);
+        if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(Array.from(frame)));
+
+        // Buffer frame into sample collector if recording
+        if (isRecordingSample) {
+          recordedFramesBuffer.push(Array.from(frame));
+          const pct = Math.min(100, Math.round((recordedFramesBuffer.length / recordingTargetCount) * 100));
+          recordingProgressBar.style.width = `${pct}%`;
+          if (recordedFramesBuffer.length >= recordingTargetCount) {
+            finishSampleRecording();
+          }
+        }
+      } catch (error) {
+        console.error('Landmark processing failed:', error);
+        setStatus('Landmark processing error — check browser console');
+      }
+    }
+
+    async function toggleWebcam() {
+      if (mediaStream) {
+        recognitionActive = false;
+        socket?.close();
+        socket = null;
+        mediaStream.getTracks().forEach(track => track.stop());
+        mediaStream = null;
+        video.srcObject = null;
+        video.classList.add('hidden');
+        cameraPlaceholder.classList.remove('hidden');
+        canvasContext.clearRect(0, 0, canvas.width, canvas.height);
+        cameraButton.textContent = 'Start Camera';
+        cameraButton.classList.replace('bg-red-500', 'bg-gray-900');
+        cameraButton.classList.replace('hover:bg-red-600', 'hover:bg-gray-800');
+        cameraResolution.textContent = 'Standby';
+        setStatus('Camera inactive');
+        return;
+      }
+
+      cameraButton.disabled = true;
+      cameraButton.textContent = 'Starting…';
+      setStatus('Requesting camera access…');
+      try {
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' }
+        });
+        video.srcObject = mediaStream;
+        await video.play();
+        video.classList.remove('hidden');
+        cameraPlaceholder.classList.add('hidden');
+        cameraResolution.textContent = `${video.videoWidth}×${video.videoHeight}`;
+        cameraButton.textContent = 'Stop Camera';
+        cameraButton.classList.replace('bg-gray-900', 'bg-red-500');
+        cameraButton.classList.replace('hover:bg-gray-800', 'hover:bg-red-600');
+
+        setStatus('Camera active — loading MediaPipe models…');
+        try {
+          await initializeLandmarkers();
+        } catch (error) {
+          console.error('MediaPipe failed to load:', error);
+          setStatus(`Camera is active, but MediaPipe could not load: ${error.message}`);
+          return;
+        }
+
+        let backendConnected = true;
+        try {
+          await connectBackend();
+        } catch (error) {
+          backendConnected = false;
+          console.error('Backend connection failed:', error);
+          setStatus(`${error.message} Landmark overlay will still run.`);
+        }
+        recognitionActive = true;
+        lastFrameAt = 0;
+        candidateSign = '';
+        candidateCount = 0;
+        committedSign = '';
+        if (backendConnected) setStatus('Camera active — collecting landmarks');
+        requestAnimationFrame(processVideoFrame);
+      } catch (error) {
+        console.error(error);
+        mediaStream?.getTracks().forEach(track => track.stop());
+        mediaStream = null;
+        socket?.close();
+        socket = null;
+        video.srcObject = null;
+        video.classList.add('hidden');
+        cameraPlaceholder.classList.remove('hidden');
+        setStatus(error.message || 'Could not start sign recognition');
+      } finally {
+        cameraButton.disabled = false;
+        if (!mediaStream) cameraButton.textContent = 'Start Camera';
+      }
+    }
+
+    function speakText(textToSpeak) {
+      if (!('speechSynthesis' in window)) return;
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(textToSpeak);
+      utterance.lang = document.getElementById('langSelect').value;
+      utterance.rate = 0.9;
+      window.speechSynthesis.speak(utterance);
+    }
+
+    function speakCurrentSentence() {
+      const sentence = sentenceText.textContent.trim();
+      if (sentence) speakText(sentence);
+    }
+
+    function triggerEmergency(displayText, audioText) {
+      sentenceText.textContent = displayText;
+      speakText(audioText);
+    }
+
+    function clearSentence() {
+      sentenceText.textContent = '';
+      committedSign = '';
+      candidateSign = '';
+      candidateCount = 0;
+    }
+
+    async function copySentence() {
+      const sentence = sentenceText.textContent.trim();
+      if (!sentence) return;
+      try {
+        await navigator.clipboard.writeText(sentence);
+        setStatus('Sentence copied to clipboard');
+      } catch {
+        setStatus('Clipboard unavailable — allow clipboard access in the browser');
+      }
+    }
+
+    window.toggleWebcam = toggleWebcam;
+    window.speakCurrentSentence = speakCurrentSentence;
+    window.triggerEmergency = triggerEmergency;
+    window.clearSentence = clearSentence;
+    window.copySentence = copySentence;
+
+    // Studio Data Collection Variables
+    let isRecordingSample = false;
+    let recordedFramesBuffer = [];
+    let recordCountdownTimer = null;
+    let recordingTargetCount = 30;
+    const recordingOverlay = document.getElementById('recordingOverlay');
+    const recordingCountdownText = document.getElementById('recordingCountdownText');
+    const recordingSubtext = document.getElementById('recordingSubtext');
+    const recordingProgressBar = document.getElementById('recordingProgressBar');
+    const recordLabelSelect = document.getElementById('recordLabelSelect');
+    const customLabelInput = document.getElementById('customLabelInput');
+    const recordSignerInput = document.getElementById('recordSignerInput');
+    const recordSampleBtn = document.getElementById('recordSampleBtn');
+    const recordStatusMsg = document.getElementById('recordStatusMsg');
+    const sessionSamplesCount = document.getElementById('sessionSamplesCount');
+    const samplesSummaryChips = document.getElementById('samplesSummaryChips');
+    let sessionSavedCount = 0;
+
+    function handleLabelSelectChange() {
+      if (recordLabelSelect.value === '__custom__') {
+        customLabelInput.classList.remove('hidden');
+        customLabelInput.focus();
+      } else {
+        customLabelInput.classList.add('hidden');
+      }
+    }
+
+    function getSelectedRecordLabel() {
+      if (recordLabelSelect.value === '__custom__') {
+        return (customLabelInput.value || 'custom_sign').trim().toLowerCase().replace(/\s+/g, '_');
+      }
+      return recordLabelSelect.value.trim().toLowerCase().replace(/\s+/g, '_');
+    }
+
+    async function refreshSamplesSummary() {
+      try {
+        const resp = await fetch('http://localhost:8000/api/samples_summary');
+        if (!resp.ok) return;
+        const data = await resp.json();
+        if (data.status === 'ok') {
+          sessionSamplesCount.textContent = data.total_samples || 0;
+          samplesSummaryChips.innerHTML = '';
+          const classes = Object.keys(data.samples_by_class || {});
+          if (classes.length === 0) {
+            samplesSummaryChips.innerHTML = '<span class="text-indigo-400/60">None yet</span>';
+          } else {
+            classes.forEach(cls => {
+              const chip = document.createElement('span');
+              const isUnk = cls === 'unknown' || cls === 'no_sign';
+              chip.className = isUnk 
+                ? 'px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/30 font-medium'
+                : 'px-2 py-0.5 rounded-md bg-indigo-800/60 text-indigo-200 border border-indigo-700/40 font-medium';
+              chip.textContent = `${cls}: ${data.samples_by_class[cls]}`;
+              samplesSummaryChips.appendChild(chip);
+            });
+          }
+        }
+      } catch (e) {
+        console.warn('Could not fetch samples summary:', e);
+      }
+    }
+
+    async function startSampleRecording() {
+      if (isRecordingSample) return;
+      if (!mediaStream || !recognitionActive) {
+        recordStatusMsg.textContent = 'Please start camera first!';
+        recordStatusMsg.className = 'text-xs text-amber-400 font-semibold';
+        alert('Please click "Start Camera" before recording gesture samples.');
+        return;
+      }
+
+      const label = getSelectedRecordLabel();
+      if (!label) {
+        alert('Please enter or select a valid gesture label.');
+        return;
+      }
+
+      recordSampleBtn.disabled = true;
+      recordedFramesBuffer = [];
+      recordingOverlay.classList.remove('hidden');
+      recordingProgressBar.style.width = '0%';
+
+      let countdown = 3;
+      recordingCountdownText.textContent = countdown;
+      recordingSubtext.textContent = `Get Ready for "${label.toUpperCase()}"...`;
+
+      recordCountdownTimer = setInterval(() => {
+        countdown -= 1;
+        if (countdown > 0) {
+          recordingCountdownText.textContent = countdown;
+        } else {
+          clearInterval(recordCountdownTimer);
+          recordingCountdownText.textContent = '🔴';
+          recordingSubtext.textContent = `RECORDING "${label.toUpperCase()}" (Perform Sign Now)...`;
+          isRecordingSample = true;
+        }
+      }, 800);
+    }
+
+    async function finishSampleRecording() {
+      isRecordingSample = false;
+      recordingOverlay.classList.add('hidden');
+      recordSampleBtn.disabled = false;
+      const label = getSelectedRecordLabel();
+      const signer = (recordSignerInput.value || 'signer').trim();
+
+      if (recordedFramesBuffer.length < 15) {
+        recordStatusMsg.textContent = 'Recording was too short; sample skipped.';
+        recordStatusMsg.className = 'text-xs text-amber-400 font-medium';
+        return;
+      }
+
+      recordStatusMsg.textContent = `Saving ${recordedFramesBuffer.length} frames for "${label}"...`;
+      recordStatusMsg.className = 'text-xs text-indigo-300 font-medium';
+
+      try {
+        const resp = await fetch('http://localhost:8000/api/save_sample', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            label: label,
+            signer: signer,
+            frames: recordedFramesBuffer
+          })
+        });
+        const res = await resp.json();
+        if (res.status === 'ok') {
+          sessionSavedCount += 1;
+          recordStatusMsg.textContent = `✅ Saved sample for "${res.label}"! (Total for sign: ${res.total_for_class})`;
+          recordStatusMsg.className = 'text-xs text-emerald-400 font-semibold';
+          await refreshSamplesSummary();
+        } else {
+          recordStatusMsg.textContent = `Error: ${res.message}`;
+          recordStatusMsg.className = 'text-xs text-red-400 font-medium';
+        }
+      } catch (err) {
+        recordStatusMsg.textContent = `Backend save error: ${err.message}`;
+        recordStatusMsg.className = 'text-xs text-red-400 font-medium';
+      }
+    }
+
+    async function recordBurstIdleSamples() {
+      recordLabelSelect.value = 'unknown';
+      handleLabelSelectChange();
+      for (let i = 1; i <= 3; i++) {
+        recordStatusMsg.textContent = `Burst Take ${i}/3: Recording idle/resting pose...`;
+        await new Promise(r => setTimeout(r, 600));
+        startSampleRecording();
+        while (isRecordingSample || !recordingOverlay.classList.contains('hidden')) {
+          await new Promise(r => setTimeout(r, 200));
+        }
+        await new Promise(r => setTimeout(r, 1200));
+      }
+      recordStatusMsg.textContent = '✅ Completed 3-take Idle/Neutral calibration batch!';
+      recordStatusMsg.className = 'text-xs text-emerald-400 font-semibold';
+    }
+
+    // Refresh summary on load
+    setTimeout(refreshSamplesSummary, 1500);
+
+    window.handleLabelSelectChange = handleLabelSelectChange;
+    window.startSampleRecording = startSampleRecording;
+    window.recordBurstIdleSamples = recordBurstIdleSamples;
+
+  </script>
+</body>
+</html>

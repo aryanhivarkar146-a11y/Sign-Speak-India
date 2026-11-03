@@ -1,0 +1,20 @@
+# Python environments and caches
+**/.venv/
+**/venv/
+**/__pycache__/
+*.py[cod]
+
+# Local secrets and logs
+.env
+.env.*
+!.env.example
+*.log
+
+# Generated render outputs and test caches
+/report_render/
+/report_render_v2/
+**/.pytest_cache/
+**/.mypy_cache/
+
+# Historical frontend backup
+/index.html.original

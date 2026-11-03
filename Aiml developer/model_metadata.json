@@ -1,0 +1,65 @@
+{
+    "model_architecture": "Conv1D_GRU_Hand",
+    "input_shape": [
+        30,
+        126
+    ],
+    "sequence_frames": 30,
+    "features_per_frame": 126,
+    "feature_layout": {
+        "left_hand": "landmarks 0..20 (63 floats)",
+        "right_hand": "landmarks 0..20 (63 floats)",
+        "total_landmarks": 42,
+        "total_floats": 126
+    },
+    "num_classes": 13,
+    "classes": [
+        "actor",
+        "adult",
+        "afternoon",
+        "alive",
+        "alright",
+        "animal",
+        "bad",
+        "bag",
+        "ball",
+        "bank",
+        "bathroom",
+        "beautiful",
+        "doctor"
+    ],
+    "class_to_idx": {
+        "actor": 0,
+        "adult": 1,
+        "afternoon": 2,
+        "alive": 3,
+        "alright": 4,
+        "animal": 5,
+        "bad": 6,
+        "bag": 7,
+        "ball": 8,
+        "bank": 9,
+        "bathroom": 10,
+        "beautiful": 11,
+        "doctor": 12
+    },
+    "idx_to_class": {
+        "0": "actor",
+        "1": "adult",
+        "2": "afternoon",
+        "3": "alive",
+        "4": "alright",
+        "5": "animal",
+        "6": "bad",
+        "7": "bag",
+        "8": "ball",
+        "9": "bank",
+        "10": "bathroom",
+        "11": "beautiful",
+        "12": "doctor"
+    },
+    "metrics": {
+        "test_accuracy": 0.6774193644523621,
+        "test_f1_weighted": 0.6912442396313364
+    }
+}

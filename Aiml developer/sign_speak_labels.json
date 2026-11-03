@@ -1,0 +1,16 @@
+{
+    "actor": 0,
+    "adult": 1,
+    "afternoon": 2,
+    "alive": 3,
+    "alright": 4,
+    "animal": 5,
+    "bad": 6,
+    "bag": 7,
+    "ball": 8,
+    "bank": 9,
+    "bathroom": 10,
+    "beautiful": 11,
+    "doctor": 12,
+    "unknown": 13
+}
