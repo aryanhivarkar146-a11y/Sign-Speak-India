@@ -11,6 +11,14 @@ python -m pip install -r "backend/requirements.txt"
 python -m uvicorn backend.server:app --host 0.0.0.0 --port 8000 --reload
 ```
 
+## OpenAI sign explanations
+
+The dashboard can request a short explanation for the currently recognized sign. This optional feature sends only the predicted English label and confidence to OpenAI; camera frames and landmark coordinates stay on the local SignSpeak inference path.
+
+Copy `backend/.env.example` to `backend/.env`, then set `OPENAI_API_KEY` to your OpenAI project API key. Keep the real key in `backend/.env`; the repository `.gitignore` excludes `.env` files. Set `OPENAI_MODEL` if you want to use a different model. Restart FastAPI after changing the key. OpenAI API usage may be billable.
+
+If no key is configured, the local sign recognition continues to work and the explanation endpoint returns a configuration message.
+
 The service loads `Aiml developer/inference.py` and its model on startup. To use a different model directory, set `SIGNSPEAK_MODEL_DIR` to the directory containing `inference.py`, `model_metadata.json`, and the `.keras` or `.h5` model. The model metadata must describe 30 frames and either 225 pose+hand values or 126 hand-only values per frame. The backend reads the model feature count from `inference.py` metadata and checks that metadata, the actual model input/output shapes, and class count agree at startup; inconsistent artifacts leave the service degraded with a diagnostic at `/health`.
 
 The browser currently sends 225 values per frame in this order: pose `[0:99]`, first hand slot `[99:162]`, second hand slot `[162:225]`. If the loaded model expects 126 hand-only values, the backend removes the first 99 pose values and sends the remaining 126 to the model. A 225-feature model receives the original frame unchanged. `GET /health` reports both `features_per_frame` (model input) and `browser_features_per_frame` (browser input).

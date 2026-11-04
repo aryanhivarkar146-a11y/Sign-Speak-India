@@ -5,10 +5,14 @@ SignSpeak is a browser-based Indian Sign Language recognition dashboard. It capt
 ## Components
 
 - `index.html`: camera-enabled browser dashboard and landmark extraction.
-- `backend/`: FastAPI WebSocket service and ISL500 dataset preparation utilities.
+- `backend/`: FastAPI WebSocket service, OpenAI sign explanations, and ISL500 dataset preparation utilities.
 - `Aiml developer/`: model inference, training scripts, metadata, and model artifacts.
 
 See [backend/README.md](backend/README.md) for setup and API details.
+
+## OpenAI sign explanations
+
+The dashboard can optionally ask OpenAI to explain a recognized sign. The backend sends only the predicted sign label and confidence; camera frames and landmark coordinates are not sent to OpenAI. Copy `backend/.env.example` to `backend/.env`, add your OpenAI project API key there, and restart the backend. The `.env` file is ignored by Git. API usage may be billable.
 
 ## License
 

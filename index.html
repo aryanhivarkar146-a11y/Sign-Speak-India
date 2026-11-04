@@ -101,6 +101,15 @@
         <div class="w-full bg-gray-100 h-1.5 rounded-full overflow-hidden mt-3">
           <div id="confidenceBar" class="bg-emerald-500 h-full w-0 transition-all duration-300"></div>
         </div>
+        <div class="mt-4 border-t border-gray-100 pt-4">
+          <div class="flex items-center justify-between gap-3">
+            <span class="text-sm font-semibold text-gray-700">AI sign explanation</span>
+            <button id="explainSignButton" type="button" disabled class="px-3 py-2 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg transition">
+              Explain this sign
+            </button>
+          </div>
+          <p id="signExplanationText" aria-live="polite" class="mt-3 text-sm leading-relaxed text-gray-600 whitespace-pre-wrap">Recognize a sign, then ask OpenAI for a short explanation.</p>
+        </div>
       </div>
 
       <!-- Constructed Sentence Output Card -->
@@ -286,6 +295,8 @@
     const matchConfidence = document.getElementById('matchConfidence');
     const confidenceBar = document.getElementById('confidenceBar');
     const sentenceText = document.getElementById('sentenceText');
+    const explainSignButton = document.getElementById('explainSignButton');
+    const signExplanationText = document.getElementById('signExplanationText');
 
     const FEATURE_COUNT = 225;
     const FRAME_INTERVAL_MS = 1000 / 15;
@@ -310,6 +321,9 @@
     let candidateSign = '';
     let candidateCount = 0;
     let committedSign = '';
+    let latestPredictedSign = '';
+    let latestPredictionConfidence = 0;
+    let explainRequestInFlight = false;
 
     function setStatus(message) {
       statusText.textContent = `● ${message}`;
@@ -387,6 +401,49 @@
       }
     }
 
+    function updateExplanationTarget(sign, confidence) {
+      const changed = sign !== latestPredictedSign;
+      latestPredictedSign = sign;
+      latestPredictionConfidence = confidence;
+      explainSignButton.disabled = !sign || explainRequestInFlight;
+      if (changed) {
+        signExplanationText.textContent = sign
+          ? `Ask OpenAI to explain “${sign}”.`
+          : 'Recognize a sign, then ask OpenAI for a short explanation.';
+      }
+    }
+
+    async function explainCurrentSign() {
+      const sign = latestPredictedSign;
+      if (!sign || explainRequestInFlight) return;
+      explainRequestInFlight = true;
+      explainSignButton.disabled = true;
+      explainSignButton.textContent = 'Explaining…';
+      signExplanationText.textContent = 'Getting an explanation from OpenAI…';
+      try {
+        const scheme = location.protocol === 'https:' ? 'https' : 'http';
+        const host = location.hostname || 'localhost';
+        const response = await fetch(`${scheme}://${host}:8000/api/explain_sign`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sign, confidence: latestPredictionConfidence })
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.detail || 'Could not get a sign explanation.');
+        if (latestPredictedSign === sign) signExplanationText.textContent = data.explanation;
+      } catch (error) {
+        if (latestPredictedSign === sign) {
+          signExplanationText.textContent = error.message || 'OpenAI could not explain this sign.';
+        }
+      } finally {
+        explainRequestInFlight = false;
+        explainSignButton.textContent = 'Explain this sign';
+        explainSignButton.disabled = !latestPredictedSign;
+      }
+    }
+
+    explainSignButton.addEventListener('click', explainCurrentSign);
+
     function renderPrediction(result) {
       const sign = String(result.predicted_sign || '').trim();
       const confidence = Math.max(0, Math.min(100, Number(result.confidence) || 0));
@@ -396,6 +453,7 @@
       
       // Handle Unknown / Neutral pose
       if (isUnknown) {
+        updateExplanationTarget('', 0);
         predictionText.textContent = 'Resting / Neutral';
         predictionText.className = 'text-2xl font-semibold tracking-tight text-gray-400 my-1';
         matchConfidence.textContent = 'No Sign Active';
@@ -408,6 +466,7 @@
 
       // Handle Low Confidence (< 60%) - Do not flash misleading guesses!
       if (confidence < 60) {
+        updateExplanationTarget('', 0);
         predictionText.textContent = '—';
         predictionText.className = 'text-4xl font-black tracking-tight text-gray-300 my-1';
         matchConfidence.textContent = `${confidence.toFixed(1)}% (Low Confidence)`;
@@ -420,6 +479,7 @@
       }
 
       // High Confidence valid sign
+      updateExplanationTarget(sign, confidence);
       predictionText.textContent = sign.toUpperCase();
       predictionText.className = 'text-4xl font-black tracking-tight text-emerald-600 my-1';
       matchConfidence.textContent = `${confidence.toFixed(1)}% Match`;

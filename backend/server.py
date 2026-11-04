@@ -12,13 +12,16 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.concurrency import run_in_threadpool
 
 
 logger = logging.getLogger("signspeak")
 BACKEND_DIR = Path(__file__).resolve().parent
+load_dotenv(BACKEND_DIR / ".env")
+
 DEFAULT_MODEL_DIR = BACKEND_DIR.parent / "Aiml developer"
 MODEL_DIR = Path(os.environ.get("SIGNSPEAK_MODEL_DIR", DEFAULT_MODEL_DIR)).expanduser().resolve()
 PREDICTOR_MODULE = MODEL_DIR / "inference.py"
@@ -284,6 +287,55 @@ class SamplePayload(BaseModel):
     label: str = Field(..., min_length=1)
     signer: str = Field(default="user")
     frames: list[list[float]]
+
+
+class SignExplanationPayload(BaseModel):
+    sign: str = Field(..., min_length=1, max_length=80)
+    confidence: float = Field(..., ge=0, le=100)
+
+
+@app.post("/api/explain_sign")
+async def explain_sign(payload: SignExplanationPayload) -> dict[str, str]:
+    """Explain a recognized label without sending camera frames to OpenAI."""
+    sign = payload.sign.strip()
+    api_key = os.environ.get("OPENAI_API_KEY", "").strip()
+    if not api_key:
+        raise HTTPException(
+            status_code=503,
+            detail="OpenAI is not configured. Add OPENAI_API_KEY to backend/.env and restart the server.",
+        )
+    if not sign:
+        raise HTTPException(status_code=422, detail="A sign label is required.")
+
+    from openai import OpenAI
+
+    client = OpenAI(api_key=api_key, timeout=30.0, max_retries=1)
+    try:
+        response = await run_in_threadpool(
+            client.responses.create,
+            model=os.environ.get("OPENAI_MODEL", "gpt-6-astra"),
+            instructions=(
+                "You help users understand a sign label predicted by an Indian Sign Language demo. "
+                "Explain the likely English word or idea in plain language in 2 to 4 short sentences. "
+                "The input is only a class label and confidence score, not video or handshape data. "
+                "Do not claim to verify the exact ISL sign, its handshape, or regional usage. "
+                "Mention briefly that the model prediction may be wrong and signs can vary by region."
+            ),
+            input=f"Predicted sign label: {sign}\nModel confidence: {payload.confidence:.1f}%",
+            max_output_tokens=160,
+            store=False,
+        )
+    except Exception as exc:
+        logger.exception("OpenAI sign explanation request failed")
+        raise HTTPException(
+            status_code=502,
+            detail="OpenAI could not generate an explanation. Check the API key, model access, and backend logs.",
+        ) from exc
+
+    explanation = response.output_text.strip()
+    if not explanation:
+        raise HTTPException(status_code=502, detail="OpenAI returned an empty explanation.")
+    return {"sign": sign, "explanation": explanation}
 
 @app.post("/api/save_sample")
 async def save_sample(payload: SamplePayload) -> dict[str, Any]:

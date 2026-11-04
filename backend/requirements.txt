@@ -3,3 +3,5 @@ uvicorn[standard]>=0.30
 numpy>=1.26
 keras>=3.0
 torch>=2.0
+openai>=1.66.0
+python-dotenv>=1.0.0
